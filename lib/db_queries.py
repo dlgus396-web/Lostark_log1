@@ -101,3 +101,29 @@ def load_mock_my_records():
             "video_url": None
         }
     ]
+
+def load_my_records(user_id: str):
+    """Load combat records for a specific user.
+    
+    Filters by user_id and orders by created_at in descending order.
+    Returns result.data from the query.
+    """
+    supabase = get_supabase_client()
+    result = (
+        supabase.table("combat_records")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return result.data
+
+def insert_combat_record(record: dict):
+    """Insert a combat record into the `combat_records` table.
+
+    Raises exceptions from the client so callers can handle them.
+    Returns the inserted row data (`result.data`).
+    """
+    supabase = get_supabase_client()
+    result = supabase.table("combat_records").insert(record).execute()
+    return result.data

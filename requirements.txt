@@ -2,3 +2,6 @@ streamlit
 supabase
 pandas
 python-dotenv
+easyocr
+pillow
+opencv-python
