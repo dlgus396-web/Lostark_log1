@@ -48,6 +48,23 @@ def load_baselines(class_name: str, boss_id: int):
     )
     return result.data
 
+def load_ranking_records(class_name: str | None = None, boss_id: int | None = None):
+    supabase = get_supabase_client()
+    query = supabase.table("combat_records").select("*")
+    if class_name:
+        query = query.eq("class_name", class_name)
+    if boss_id is not None:
+        query = query.eq("boss_id", boss_id)
+    result = query.order("final_score", desc=True).execute()
+    data = result.data or []
+
+    # Filter video_url presence in Python to avoid incorrect Supabase query builder usage
+    filtered = [
+        r for r in data if (r.get("video_url") is not None and str(r.get("video_url")).strip() != "")
+    ]
+    return filtered
+
+
 def load_mock_ranking_records():
     # mock 랭킹 데이터 반환
     return [
@@ -126,4 +143,16 @@ def insert_combat_record(record: dict):
     """
     supabase = get_supabase_client()
     result = supabase.table("combat_records").insert(record).execute()
+    return result.data
+
+
+def insert_report(record_id: int, reporter_user_id: str, report_reason: str):
+    """Insert a report into the `reports` table."""
+    supabase = get_supabase_client()
+    report_payload = {
+        "record_id": record_id,
+        "reporter_user_id": reporter_user_id,
+        "report_reason": report_reason,
+    }
+    result = supabase.table("reports").insert(report_payload).execute()
     return result.data

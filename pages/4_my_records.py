@@ -36,7 +36,9 @@ try:
         # Display expandable details for each record
         st.divider()
         for i, rec in enumerate(records):
-            with st.expander(f"상세 보기 - {rec.get('class_name', 'N/A')} (점수: {rec.get('final_score', 'N/A')}) - {rec.get('created_at', 'N/A')}"):
+            rec_id = rec.get("id")
+            title = f"상세 보기 - {rec.get('class_name', 'N/A')} (점수: {rec.get('final_score', 'N/A')}) - {rec.get('created_at', 'N/A')} - id:{rec_id}"
+            with st.expander(title):
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write(f"**직업:** {rec.get('class_name')}")

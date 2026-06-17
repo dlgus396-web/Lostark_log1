@@ -3,6 +3,7 @@ from lib.utils import render_sidebar
 from lib.db_queries import load_supported_classes, load_bosses, load_score_rules, load_baselines
 from lib.mock_analysis import run_mock_ocr, extract_mock_combat_metrics
 from lib.scoring import calculate_final_score
+from lib.storage import upload_combat_screenshot
 from lib.image_analysis import (
     analyze_images_by_class,
     parse_battle_time_to_minutes,
@@ -111,6 +112,22 @@ if selected_class in supported_auto_classes:
             st.info("이미지 분석 중입니다. 잠깐만 기다려주세요...")
             try:
                 raw_result = analyze_images_by_class(selected_class, summary_image, attack_image)
+                # upload screenshots to Supabase Storage (non-blocking on failure)
+                summary_url = "mock://uploaded_screenshot.png"
+                attack_url = None
+                try:
+                    summary_url = upload_combat_screenshot(summary_image, user["id"], label="summary")
+                except Exception as e:
+                    st.error("스크린샷 업로드 중 오류가 발생했습니다.")
+                    st.caption(str(e))
+                    summary_url = "mock://uploaded_screenshot.png"
+                if attack_image:
+                    try:
+                        attack_url = upload_combat_screenshot(attack_image, user["id"], label="attack")
+                    except Exception as e:
+                        st.error("스크린샷 업로드 중 오류가 발생했습니다.")
+                        st.caption(str(e))
+                        attack_url = None
                 ocr_text = f"Summary:\n{raw_result.get('summary_ocr_raw', '')}\n\nAttack:\n{raw_result.get('attack_ocr_raw', '')}"
                 extracted_count = raw_result.get(count_field_map[selected_class]) or 0
                 extracted_battle_time = raw_result.get("battle_time") or ""
@@ -135,11 +152,12 @@ if selected_class in supported_auto_classes:
                     "final_score": 0.0,
                     "score_version": "v1",
                     "video_url": video_url,
-                    "screenshot_url": "mock://uploaded_screenshot.png",
+                    "screenshot_url": summary_url,
                     "ocr_raw_text": ocr_text,
                     "ocr_status": ocr_status,
                     "summary_ocr_raw": raw_result.get("summary_ocr_raw", ""),
                     "attack_ocr_raw": raw_result.get("attack_ocr_raw", ""),
+                    "attack_screenshot_url": attack_url,
                 }
             except Exception:
                 st.error("이미지 분석 중 오류가 발생했습니다. 직접 입력해주세요.")
@@ -337,6 +355,14 @@ else:
                         back_attack_rate,
                         head_attack_rate,
                     )
+                    # attempt to upload the single uploaded_file to storage
+                    screenshot_url = "mock://uploaded_screenshot.png"
+                    try:
+                        screenshot_url = upload_combat_screenshot(uploaded_file, user["id"], label="summary")
+                    except Exception as e:
+                        st.error("스크린샷 업로드 중 오류가 발생했습니다.")
+                        st.caption(str(e))
+
                     st.session_state["analysis_result"] = {
                         "class_name": selected_class,
                         "boss_id": boss_id,
@@ -346,7 +372,7 @@ else:
                         "head_attack_rate": head_attack_rate,
                         "final_score": final_score,
                         "ocr_raw_text": ocr_result["ocr_raw_text"],
-                        "screenshot_url": "mock://uploaded_screenshot.png",
+                        "screenshot_url": screenshot_url,
                     }
                     st.success("분석이 완료되었습니다. 분석 결과 화면으로 이동해주세요.")
             except Exception as e:

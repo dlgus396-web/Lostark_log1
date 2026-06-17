@@ -30,24 +30,54 @@ else:
     if result.get("video_url"):
         st.write(f"**영상 링크:** {result['video_url']}")
     st.write(f"**OCR 원문:** {result['ocr_raw_text']}")
+    if result.get("screenshot_url"):
+        st.markdown(f"**스크린샷:** [{result['screenshot_url']}]({result['screenshot_url']})")
     st.info("로그인/ OCR/ Storage 업로드는 mock 상태입니다. DB 저장만 실제로 시도합니다.")
+    def normalize_ocr_status_for_db(status: str | None) -> str:
+        """Normalize various ocr_status inputs to either 'success' or 'fallback_used'.
+
+        Rules:
+        - if status == 'success' -> 'success'
+        - if status == 'fallback_used' -> 'fallback_used'
+        - if 'success' in status -> 'success'
+        - otherwise -> 'fallback_used'
+        """
+        if not status:
+            return "fallback_used"
+        s = str(status).lower()
+        if s == "success":
+            return "success"
+        if s == "fallback_used":
+            return "fallback_used"
+        if "success" in s:
+            return "success"
+        return "fallback_used"
+
+    # build record only with allowed columns for combat_records
+    record = {
+        "user_id": user["id"] if user else None,
+        "class_name": result.get("class_name"),
+        "boss_id": result.get("boss_id"),
+        "boss_name_raw": result.get("boss_name_raw") or str(result.get("boss_id")),
+        "screenshot_url": result.get("screenshot_url"),
+        "ocr_raw_text": result.get("ocr_raw_text"),
+        # normalize to DB-allowed values
+        "ocr_status": normalize_ocr_status_for_db(result.get("ocr_status")),
+        "final_score": result.get("final_score"),
+        "key_action_cpm": result.get("key_action_cpm"),
+        "back_attack_rate": result.get("back_attack_rate"),
+        "head_attack_rate": result.get("head_attack_rate"),
+        "score_version": result.get("score_version") or "v1",
+        "video_url": result.get("video_url"),
+    }
+
+    # Ensure only allowed DB columns are present (attack_screenshot_url excluded)
+
+    with st.expander("DB 저장 데이터 확인"):
+        st.json(record)
+
     if user and st.button("DB에 기록 저장"):
         try:
-            record = {
-                "user_id": user["id"],
-                "class_name": result.get("class_name"),
-                "boss_id": result.get("boss_id"),
-                "boss_name_raw": result.get("boss_name_raw") or str(result.get("boss_id")),
-                "screenshot_url": result.get("screenshot_url"),
-                "ocr_raw_text": result.get("ocr_raw_text"),
-                "ocr_status": result.get("ocr_status") or "ocr_failed",
-                "final_score": result.get("final_score"),
-                "key_action_cpm": result.get("key_action_cpm"),
-                "back_attack_rate": result.get("back_attack_rate"),
-                "head_attack_rate": result.get("head_attack_rate"),
-                "score_version": result.get("score_version") or "v1",
-                "video_url": result.get("video_url"),
-            }
             insert_combat_record(record)
             st.success("전투 기록이 DB에 저장되었습니다.")
         except Exception as e:
