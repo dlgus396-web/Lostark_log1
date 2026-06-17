@@ -1,18 +1,21 @@
 import streamlit as st
 from lib.db_queries import load_my_records
 from lib.utils import render_sidebar
-
-# 임시 로그인 미구현 상태를 위한 테스트 유저 ID (나중에 실제 profiles.id로 교체)
-MOCK_USER_ID = "여기에_profiles_id_UUID_입력"
+from lib.auth import get_current_user
 
 render_sidebar()
 
 st.title("내 기록")
 
-st.caption(f"현재 사용자: Mock User ({MOCK_USER_ID[:8]}...)")
+user = get_current_user()
+if not user:
+    st.warning("내 기록 조회를 위해 로그인해주세요.")
+    st.stop()
+
+st.caption(f"현재 사용자: {user.get('email')}")
 
 try:
-    records = load_my_records(MOCK_USER_ID)
+    records = load_my_records(user["id"])
     if not records:
         st.info("아직 저장된 전투 기록이 없습니다.")
     else:

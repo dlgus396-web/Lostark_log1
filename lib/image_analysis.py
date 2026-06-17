@@ -180,7 +180,7 @@ def crop_by_ratio(image, left: float, top: float, right: float, bottom: float):
 def extract_blade_burst_count(text: str) -> Optional[int]:
     """Extract blade burst usage count from OCR text.
     
-    Looks for high numbers that might indicate usage count.
+    Looks for Blade Burst keywords or nearby numbers.
     Returns: count as int or None if not found
     """
     if not text:
@@ -193,7 +193,6 @@ def extract_blade_burst_count(text: str) -> Optional[int]:
         r'버스트[:\s]+(\d+)',
     ]
     
-    # First try patterns on single-line or inline matches
     for pattern in burst_patterns:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
@@ -204,14 +203,10 @@ def extract_blade_burst_count(text: str) -> Optional[int]:
             except ValueError:
                 pass
 
-    # Prefer searching around lines that contain '버스트' (handle OCR misreads like '불레이드')
     lines = [ln.rstrip() for ln in text.splitlines() if ln is not None]
     for i, line in enumerate(lines):
         if '버스트' in line:
-            # create a window from this line to the next up to 10 lines
             window_lines = lines[i:i+11]
-
-            # 1) Look for a whole-line integer (only digits) within the window -> highest priority
             for wl in window_lines:
                 if re.match(r'^\s*\d{1,3}\s*$', wl):
                     try:
@@ -221,10 +216,8 @@ def extract_blade_burst_count(text: str) -> Optional[int]:
                     except ValueError:
                         pass
 
-            # 2) If none, collect numeric candidates not adjacent to '.' , ',' or Korean '억'
             candidates = []
             for wl in window_lines:
-                # find digit tokens that are not part of decimals or suffixed with '억'
                 for m in re.finditer(r'(?<![\d.,억])(\d{1,3})(?![\d.,억])', wl):
                     try:
                         num = int(m.group(1))
@@ -233,16 +226,106 @@ def extract_blade_burst_count(text: str) -> Optional[int]:
                     except ValueError:
                         continue
 
-            # 3) From candidates, prefer those in 80-200 range; choose the last (rear) one
             wide_candidates = [c for c in candidates if 80 <= c <= 200]
             if wide_candidates:
                 return wide_candidates[-1]
-
-            # 4) If still none, if there are any candidates, return the last one
             if candidates:
                 return candidates[-1]
 
-    # If no '버스트' marker found or nothing matched, return None
+    return None
+
+
+def _find_integer_candidates(text: str) -> list[int]:
+    return [
+        int(match.group(1))
+        for match in re.finditer(r'(?<![\d.,억])(\d{1,3})(?![\d.,억])', text)
+        if 1 <= int(match.group(1)) <= 300
+    ]
+
+
+def _pick_best_count(candidates: list[int]) -> Optional[int]:
+    if not candidates:
+        return None
+    preferred = [value for value in candidates if 10 <= value <= 300]
+    return preferred[-1] if preferred else candidates[-1]
+
+
+def extract_breaker_nakhwa_count(text: str) -> Optional[int]:
+    """Extract breaker '낙화' usage count from OCR text.
+
+    Search from the line containing '낙화' and the following 10 lines for a valid count.
+    """
+    if not text:
+        return None
+
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    for idx, line in enumerate(lines):
+        if '낙화' in line or '권왕십이식' in line:
+            window = lines[idx:idx + 11]
+            joined = ' '.join(window)
+            patterns = [
+                r'낙화[^\d]*(\d{1,3})',
+                r'낙화[^\d]*([0-9]{1,3})',
+                r'\b(\d{1,3})\s*회\b',
+                r'\b(\d{1,3})\b',
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, joined)
+                if match:
+                    try:
+                        value = int(match.group(1))
+                        if 1 <= value <= 300:
+                            return value
+                    except ValueError:
+                        continue
+            candidates = []
+            for window_line in window:
+                candidates.extend(_find_integer_candidates(window_line))
+            return _pick_best_count(candidates)
+
+    return None
+
+
+def extract_arcana_card_count(text: str) -> Optional[int]:
+    """Extract arcana card usage count from OCR text.
+
+    Look for '카드', '사용', '횟수' 단어와 주변 숫자를 함께 검사합니다.
+    """
+    if not text:
+        return None
+
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    for idx, line in enumerate(lines):
+        if any(keyword in line for keyword in ['카드', '사용', '횟수']):
+            joined = ' '.join(lines[idx:idx + 3])
+            patterns = [
+                r'카드[^\d]*(\d{1,3})',
+                r'카드[^\d]*사용[^\d]*(\d{1,3})',
+                r'사용[^\d]*횟수[^\d]*(\d{1,3})',
+                r'횟수[^\d]*(\d{1,3})',
+                r'\b(\d{1,3})\s*회\b',
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, joined)
+                if match:
+                    try:
+                        value = int(match.group(1))
+                        if 1 <= value <= 300:
+                            return value
+                    except ValueError:
+                        continue
+            candidates = _find_integer_candidates(joined)
+            if candidates:
+                return _pick_best_count(candidates)
+
+    # Fallback: if there is a line with '카드' but no count yet, check adjacent lines
+    for idx, line in enumerate(lines):
+        if '카드' in line:
+            window = ' '.join(lines[idx:idx + 3])
+            candidates = _find_integer_candidates(window)
+            if candidates:
+                return _pick_best_count(candidates)
+
     return None
 
 
@@ -355,3 +438,83 @@ def analyze_blade_images(summary_image, attack_image) -> dict:
             print(f"Error processing attack image: {e}")
     
     return result
+
+
+def analyze_breaker_images(summary_image, attack_image) -> dict:
+    result = {
+        "battle_time": None,
+        "breaker_nakhwa_count": None,
+        "summary_ocr_raw": "",
+        "attack_ocr_raw": "",
+    }
+
+    if summary_image:
+        try:
+            full_summary_text = perform_ocr(summary_image)
+        except Exception:
+            full_summary_text = ""
+        result["summary_ocr_raw"] = full_summary_text
+        battle_time = extract_battle_time(full_summary_text)
+        if battle_time:
+            result["battle_time"] = battle_time
+
+    if attack_image:
+        try:
+            attack_text = perform_ocr(attack_image)
+        except Exception:
+            attack_text = ""
+        result["attack_ocr_raw"] = attack_text
+        nakhwa_count = extract_breaker_nakhwa_count(attack_text)
+        if nakhwa_count is not None:
+            result["breaker_nakhwa_count"] = nakhwa_count
+
+    return result
+
+
+def analyze_arcana_images(summary_image, attack_image=None) -> dict:
+    result = {
+        "battle_time": None,
+        "arcana_card_count": None,
+        "summary_ocr_raw": "",
+        "attack_ocr_raw": "",
+    }
+
+    if summary_image:
+        try:
+            full_summary_text = perform_ocr(summary_image)
+        except Exception:
+            full_summary_text = ""
+        result["summary_ocr_raw"] = full_summary_text
+        battle_time = extract_battle_time(full_summary_text)
+        if battle_time:
+            result["battle_time"] = battle_time
+        card_count = extract_arcana_card_count(full_summary_text)
+        if card_count is not None:
+            result["arcana_card_count"] = card_count
+
+    if result["arcana_card_count"] is None and attack_image:
+        try:
+            attack_text = perform_ocr(attack_image)
+        except Exception:
+            attack_text = ""
+        result["attack_ocr_raw"] = attack_text
+        card_count = extract_arcana_card_count(attack_text)
+        if card_count is not None:
+            result["arcana_card_count"] = card_count
+
+    return result
+
+
+def analyze_images_by_class(class_name, summary_image, attack_image=None) -> dict:
+    if class_name == "블레이드":
+        return analyze_blade_images(summary_image, attack_image)
+    if class_name == "브레이커":
+        return analyze_breaker_images(summary_image, attack_image)
+    if class_name == "아르카나":
+        return analyze_arcana_images(summary_image, attack_image)
+
+    return {
+        "battle_time": None,
+        "summary_ocr_raw": perform_ocr(summary_image) if summary_image else "",
+        "attack_ocr_raw": perform_ocr(attack_image) if attack_image else "",
+    }

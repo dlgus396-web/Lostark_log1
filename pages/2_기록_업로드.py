@@ -1,7 +1,16 @@
 import streamlit as st
+from lib.utils import render_sidebar
+from lib.auth import get_current_user
 from lib.db_queries import load_supported_classes, load_bosses, load_score_rules, load_baselines
 from lib.mock_analysis import run_mock_ocr, extract_mock_combat_metrics, create_mock_analysis_result
 from lib.scoring import calculate_final_score
+
+render_sidebar()
+
+user = get_current_user()
+if not user:
+    st.warning("로그인 후 기록 업로드를 이용할 수 있습니다. 로그인 페이지에서 이메일/비밀번호로 로그인해주세요.")
+    st.stop()
 
 st.title("전투 기록 업로드")
 

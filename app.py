@@ -30,5 +30,5 @@ with col3:
         st.switch_page("pages/4_my_records.py")
 
 st.caption(
-    "* 본 프로젝트는 기본틀 시연용입니다. 실제 로그인, OCR, Storage 기능은 mock 처리되어 있습니다."
+    "* 본 프로젝트는 기본틀 시연용입니다. 이메일/비밀번호 기반 Supabase 로그인 기능이 구현되어 있으며, OCR 및 Storage는 mock 처리되어 있습니다."
 )
