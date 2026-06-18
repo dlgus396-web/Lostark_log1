@@ -1,7 +1,35 @@
 import streamlit as st
+from datetime import datetime
 from lib.auth import get_current_user
 from lib.db_queries import load_ranking_records, load_supported_classes, load_bosses, insert_report
 from lib.utils import render_empty_state, render_sidebar
+
+def format_created_date(created_at: str | None) -> str:
+    """Format ISO datetime string to YYYY/MM/DD format.
+    
+    Args:
+        created_at: ISO format datetime string (e.g., 2026-06-17T14:28:37.879381+00:00)
+    
+    Returns:
+        Formatted date string in YYYY/MM/DD format, or "-" if None.
+    """
+    if created_at is None:
+        return "-"
+    
+    try:
+        # Parse ISO format datetime
+        dt = datetime.fromisoformat(created_at)
+        return dt.strftime("%Y/%m/%d")
+    except (ValueError, TypeError):
+        # Fallback: use first 10 characters (YYYY-MM-DD) and convert to YYYY/MM/DD
+        if isinstance(created_at, str) and len(created_at) >= 10:
+            date_str = created_at[:10]  # YYYY-MM-DD
+            try:
+                dt = datetime.strptime(date_str, "%Y-%m-%d")
+                return dt.strftime("%Y/%m/%d")
+            except ValueError:
+                return "-"
+        return "-"
 
 render_sidebar()
 
@@ -48,7 +76,7 @@ else:
             "핵심 행동 CPM": rec.get("key_action_cpm"),
             "백어택률": rec.get("back_attack_rate"),
             "영상 링크": rec.get("video_url"),
-            "생성일": rec.get("created_at"),
+            "생성일": format_created_date(rec.get("created_at")),
         })
 
     st.dataframe(display_data, use_container_width=True)
@@ -66,7 +94,7 @@ else:
             st.write(f"**핵심 행동 CPM:** {rec.get('key_action_cpm')}")
             st.write(f"**백어택률:** {rec.get('back_attack_rate')}")
             st.write(f"**영상 링크:** {rec.get('video_url')}")
-            st.write(f"**생성일:** {rec.get('created_at')}")
+            st.write(f"**생성일:** {format_created_date(rec.get('created_at'))}")
             report_reason_key = f"report_reason_{record_id or idx}"
             report_button_key = f"report_submit_{record_id or idx}"
             report_reason = st.text_area(

@@ -48,6 +48,36 @@ def load_baselines(class_name: str, boss_id: int):
     )
     return result.data
 
+def load_ranking_records(class_name: str | None = None, boss_id: int | None = None):
+    """Load ranking records (only those with video_url).
+    
+    Args:
+        class_name: Optional filter by class name
+        boss_id: Optional filter by boss ID
+    
+    Returns:
+        List of combat records with non-empty video_url, sorted by final_score descending.
+    """
+    supabase = get_supabase_client()
+    query = supabase.table("combat_records").select("*")
+    
+    if class_name is not None:
+        query = query.eq("class_name", class_name)
+    
+    if boss_id is not None:
+        query = query.eq("boss_id", boss_id)
+    
+    result = query.order("final_score", desc=True).execute()
+    
+    # Filter for non-empty video_url in Python
+    filtered = [
+        record for record in result.data
+        if record.get("video_url") is not None
+        and str(record.get("video_url")).strip() != ""
+    ]
+    
+    return filtered
+
 def load_mock_ranking_records():
     # mock 랭킹 데이터 반환
     return [
@@ -123,4 +153,24 @@ def insert_combat_record(record: dict):
     """
     supabase = get_supabase_client()
     result = supabase.table("combat_records").insert(record).execute()
+    return result.data
+
+def insert_report(record_id: int, user_id: str, reason: str):
+    """Insert a report (신고) into the `reports` table.
+    
+    Args:
+        record_id: ID of the combat record being reported
+        user_id: ID of the user submitting the report
+        reason: Reason for the report
+    
+    Raises exceptions from the client so callers can handle them.
+    Returns the inserted row data (`result.data`).
+    """
+    supabase = get_supabase_client()
+    report = {
+        "record_id": record_id,
+        "user_id": user_id,
+        "reason": reason,
+    }
+    result = supabase.table("reports").insert(report).execute()
     return result.data
