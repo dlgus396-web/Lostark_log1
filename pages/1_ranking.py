@@ -41,12 +41,12 @@ else:
     for idx, rec in enumerate(records, start=1):
         display_data.append({
             "순위": idx,
+            "캐릭터명": rec.get("character_name") or "-",
             "직업": rec.get("class_name"),
             "레이드 ID": rec.get("boss_id"),
             "최종 점수": rec.get("final_score"),
             "핵심 행동 CPM": rec.get("key_action_cpm"),
             "백어택률": rec.get("back_attack_rate"),
-            "헤드어택률": rec.get("head_attack_rate"),
             "영상 링크": rec.get("video_url"),
             "생성일": rec.get("created_at"),
         })
@@ -57,14 +57,14 @@ else:
     user = get_current_user()
     for idx, rec in enumerate(records, start=1):
         record_id = rec.get("id")
-        expander_title = f"순위 {idx} - {rec.get('class_name', 'N/A')} / 레이드 {rec.get('boss_id', 'N/A')} - id:{record_id}"
+        expander_title = f"순위 {idx} - {rec.get('character_name', '-') or '-'} / {rec.get('class_name', 'N/A')} / 점수 {rec.get('final_score', 'N/A')}"
         with st.expander(expander_title):
+            st.write(f"**캐릭터명:** {rec.get('character_name') or '-'}")
             st.write(f"**직업:** {rec.get('class_name')}")
             st.write(f"**레이드 ID:** {rec.get('boss_id')}")
             st.write(f"**최종 점수:** {rec.get('final_score')}")
             st.write(f"**핵심 행동 CPM:** {rec.get('key_action_cpm')}")
             st.write(f"**백어택률:** {rec.get('back_attack_rate')}")
-            st.write(f"**헤드어택률:** {rec.get('head_attack_rate')}")
             st.write(f"**영상 링크:** {rec.get('video_url')}")
             st.write(f"**생성일:** {rec.get('created_at')}")
             report_reason_key = f"report_reason_{record_id or idx}"

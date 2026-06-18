@@ -14,24 +14,20 @@ def extract_mock_combat_metrics(selected_class: str):
         return {
             "key_action_cpm": 6.0,
             "back_attack_rate": 75.0,
-            "head_attack_rate": None
         }
     if selected_class == "브레이커":
         return {
             "key_action_cpm": 3.2,
             "back_attack_rate": None,
-            "head_attack_rate": 80.0
         }
     if selected_class == "아르카나":
         return {
             "key_action_cpm": 22.0,
             "back_attack_rate": None,
-            "head_attack_rate": None
         }
     return {
         "key_action_cpm": 0.0,
         "back_attack_rate": None,
-        "head_attack_rate": None
     }
 
 def create_mock_analysis_result(selected_class: str, selected_boss_id: int, video_url: str | None):

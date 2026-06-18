@@ -24,7 +24,7 @@ def calculate_metric_score(value: float | None, baseline: dict) -> float:
     else:
         return 100.0
 
-def get_metric_values_by_class(class_name: str, key_action_cpm: float, back_attack_rate: float | None, head_attack_rate: float | None = None) -> dict:
+def get_metric_values_by_class(class_name: str, key_action_cpm: float, back_attack_rate: float | None) -> dict:
     if class_name == "블레이드":
         return {
             "blade_burst_cpm": key_action_cpm,
@@ -46,14 +46,12 @@ def calculate_final_score(
     baselines: list,
     key_action_cpm: float,
     back_attack_rate: float | None = None,
-    head_attack_rate: float | None = None
 ) -> float:
     baseline_map = {row["metric_name"]: row for row in baselines}
     metric_values = get_metric_values_by_class(
         class_name,
         key_action_cpm,
         back_attack_rate,
-        head_attack_rate
     )
     final_score = 0.0
     total_weight = 0.0

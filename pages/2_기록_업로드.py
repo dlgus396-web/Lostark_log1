@@ -47,15 +47,11 @@ if selected_class:
     mock_metrics = extract_mock_combat_metrics(selected_class)
     key_action_cpm = st.number_input("핵심 행동 CPM", min_value=0.0, value=mock_metrics["key_action_cpm"])
     back_attack_rate = None
-    head_attack_rate = None
     if selected_class == "블레이드":
         back_attack_rate = st.number_input("백어택 적중률", min_value=0.0, max_value=100.0, value=mock_metrics["back_attack_rate"] or 0.0)
-    if selected_class == "브레이커":
-        head_attack_rate = st.number_input("헤드어택 적중률", min_value=0.0, max_value=100.0, value=mock_metrics["head_attack_rate"] or 0.0)
 else:
     key_action_cpm = 0.0
     back_attack_rate = None
-    head_attack_rate = None
 
 if st.button("분석 실행하기"):
     if not uploaded_file:
@@ -74,7 +70,7 @@ if st.button("분석 실행하기"):
                 st.warning("선택한 직업/레이드에 해당하는 scoring_baselines 데이터가 없습니다.")
             else:
                 final_score = calculate_final_score(
-                    selected_class, rules, baselines, key_action_cpm, back_attack_rate, head_attack_rate
+                    selected_class, rules, baselines, key_action_cpm, back_attack_rate
                 )
                 st.session_state["analysis_result"] = {
                     "class_name": selected_class,
@@ -82,7 +78,6 @@ if st.button("분석 실행하기"):
                     "video_url": video_url,
                     "key_action_cpm": key_action_cpm,
                     "back_attack_rate": back_attack_rate,
-                    "head_attack_rate": head_attack_rate,
                     "final_score": final_score,
                     "ocr_raw_text": ocr_result["ocr_raw_text"],
                     "screenshot_url": "mock://uploaded_screenshot.png"

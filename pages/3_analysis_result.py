@@ -17,6 +17,7 @@ else:
     if not user:
         st.info("로그인하면 분석 결과를 DB에 저장할 수 있습니다. 로그인 페이지로 이동해주세요.")
     st.metric("최종 점수", f"{result['final_score']:.2f}")
+    st.write(f"**캐릭터명:** {result.get('character_name', '-')}")
     st.write(f"**직업:** {result['class_name']}")
     st.write(f"**레이드:** {result.get('boss_name_raw') or result.get('boss_id')}")
     st.write(f"**전투 시간:** {result.get('battle_time_text') or 'N/A'}")
@@ -25,8 +26,6 @@ else:
     st.write(f"**핵심 행동 CPM:** {result.get('key_action_cpm')}")
     if result.get("back_attack_rate") is not None:
         st.write(f"**백어택 적중률:** {result['back_attack_rate']}")
-    if result.get("head_attack_rate") is not None:
-        st.write(f"**헤드어택 적중률:** {result['head_attack_rate']}")
     if result.get("video_url"):
         st.write(f"**영상 링크:** {result['video_url']}")
     st.write(f"**OCR 원문:** {result['ocr_raw_text']}")
@@ -59,6 +58,7 @@ else:
         "class_name": result.get("class_name"),
         "boss_id": result.get("boss_id"),
         "boss_name_raw": result.get("boss_name_raw") or str(result.get("boss_id")),
+        "character_name": result.get("character_name"),
         "screenshot_url": result.get("screenshot_url"),
         "ocr_raw_text": result.get("ocr_raw_text"),
         # normalize to DB-allowed values
@@ -66,7 +66,6 @@ else:
         "final_score": result.get("final_score"),
         "key_action_cpm": result.get("key_action_cpm"),
         "back_attack_rate": result.get("back_attack_rate"),
-        "head_attack_rate": result.get("head_attack_rate"),
         "score_version": result.get("score_version") or "v1",
         "video_url": result.get("video_url"),
     }

@@ -14,7 +14,7 @@ if user:
     if st.button("로그아웃"):
         sign_out()
         st.success("로그아웃되었습니다.")
-        st.experimental_rerun()
+        st.rerun()
     st.info("기록 업로드와 내 기록 조회는 로그인 후에 이용할 수 있습니다.")
 else:
     email = st.text_input("이메일", key="login_email")
@@ -27,22 +27,29 @@ else:
                 st.warning("이메일과 비밀번호를 모두 입력해주세요.")
             else:
                 try:
-                    sign_up_with_email(email, password)
-                    st.success("회원가입 및 로그인에 성공했습니다.")
-                    st.experimental_rerun()
+                    user_obj = sign_up_with_email(email, password)
                 except Exception as e:
                     st.error(f"회원가입 중 오류가 발생했습니다: {e}")
+                else:
+                    # 회원가입 성공 시 자동 로그인 상태가 있을 수 있으므로 로그아웃 처리
+                    try:
+                        sign_out()
+                    except Exception:
+                        pass
+                    st.success("회원가입이 완료되었습니다. 이제 로그인 버튼을 눌러주세요.")
     with col2:
         if st.button("로그인"):
             if not email or not password:
                 st.warning("이메일과 비밀번호를 모두 입력해주세요.")
             else:
                 try:
-                    sign_in_with_email(email, password)
-                    st.success("로그인에 성공했습니다.")
-                    st.experimental_rerun()
+                    user_obj = sign_in_with_email(email, password)
                 except Exception as e:
                     st.error(f"로그인 중 오류가 발생했습니다: {e}")
+                else:
+                    # 로그인 성공: 세션에 사용자 정보를 보장하고 새로고침
+                    st.success("로그인에 성공했습니다.")
+                    st.rerun()
 
     st.markdown(
         "로그인 후 기록 업로드, 분석 결과 저장, 내 기록 조회 기능을 이용할 수 있습니다."
