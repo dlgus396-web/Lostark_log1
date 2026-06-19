@@ -189,13 +189,30 @@ def insert_combat_record(record: dict):
     result = supabase.table("combat_records").insert(record).execute()
     return result.data
 
-def insert_report(record_id: int, user_id: str, reason: str):
+
+def delete_combat_record(record_id: int, user_id: str):
+    """Delete a combat record owned by the given user.
+
+    Only deletes if both record id and user id match.
+    """
+    supabase = get_supabase_client()
+    result = (
+        supabase.table("combat_records")
+        .delete()
+        .eq("id", record_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return result.data
+
+
+def insert_report(record_id: int, reporter_user_id: str, report_reason: str):
     """Insert a report (신고) into the `reports` table.
     
     Args:
         record_id: ID of the combat record being reported
-        user_id: ID of the user submitting the report
-        reason: Reason for the report
+        reporter_user_id: ID of the user submitting the report
+        report_reason: Reason for the report
     
     Raises exceptions from the client so callers can handle them.
     Returns the inserted row data (`result.data`).
@@ -203,8 +220,8 @@ def insert_report(record_id: int, user_id: str, reason: str):
     supabase = get_supabase_client()
     report = {
         "record_id": record_id,
-        "user_id": user_id,
-        "reason": reason,
+        "reporter_user_id": reporter_user_id,
+        "report_reason": report_reason,
     }
     result = supabase.table("reports").insert(report).execute()
     return result.data

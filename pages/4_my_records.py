@@ -1,6 +1,6 @@
 import streamlit as st
 from lib.auth import get_current_user
-from lib.db_queries import load_my_records, load_boss_map
+from lib.db_queries import load_my_records, load_boss_map, delete_combat_record
 from lib.utils import render_sidebar, format_created_date
 
 render_sidebar()
@@ -81,6 +81,30 @@ try:
                         st.write(f"**생성일:** {format_created_date(rec.get('created_at'))}")
                     if rec.get('video_url'):
                         st.write(f"**영상 링크:** [링크]({rec.get('video_url')})")
+
+                    st.markdown("---")
+                    st.warning("위험 작업")
+                    st.write("삭제한 기록은 복구할 수 없습니다.")
+
+                    record_id = rec.get("id")
+                    confirm_key = f"confirm_delete_{record_id or i}"
+                    delete_key = f"delete_record_{record_id or i}"
+                    confirm_delete = st.checkbox("이 기록을 삭제하겠습니다.", key=confirm_key)
+
+                    if record_id is None:
+                        st.error("기록 ID를 찾을 수 없습니다.")
+                    else:
+                        if st.button("기록 삭제", key=delete_key):
+                            if not confirm_delete:
+                                st.warning("삭제하려면 확인 체크박스를 선택해주세요.")
+                            else:
+                                try:
+                                    delete_combat_record(record_id, user["id"])
+                                    st.success("기록이 삭제되었습니다.")
+                                    st.experimental_rerun()
+                                except Exception as e:
+                                    st.error("기록 삭제 중 오류가 발생했습니다.")
+                                    st.caption(str(e))
 except Exception as e:
     st.error("내 기록 데이터를 불러오지 못했습니다.")
     st.caption(str(e))
