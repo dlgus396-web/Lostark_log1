@@ -62,6 +62,7 @@ except Exception as e:
     st.caption(str(e))
     st.stop()
 
+records = records[:10]
 if not records:
     render_empty_state("랭킹에 표시할 기록이 없습니다. 영상 링크가 포함된 기록을 저장해주세요.")
 else:
