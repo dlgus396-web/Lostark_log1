@@ -14,7 +14,6 @@ def render_sidebar():
     st.sidebar.page_link("pages/2_upload.py", label="기록 업로드", icon="📤")
     st.sidebar.page_link("pages/3_analysis_result.py", label="분석 결과", icon="🔎")
     st.sidebar.page_link("pages/4_my_records.py", label="내 기록", icon="📒")
-    st.sidebar.page_link("pages/5_db_check.py", label="DB 상태 확인", icon="🗄️")
 
 
 def format_score(score: float) -> str:

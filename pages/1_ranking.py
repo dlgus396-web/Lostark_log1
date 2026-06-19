@@ -94,7 +94,7 @@ else:
                     st.error("신고할 기록 ID를 찾을 수 없습니다.")
                 else:
                     try:
-                        insert_report(record_id, user["id"], report_reason.strip())
+                        insert_report(record_id, user["id"], report_reason)
                         st.success("신고가 접수되었습니다.")
                     except Exception as e:
                         error_msg = str(e).lower()
@@ -102,4 +102,4 @@ else:
                             st.warning("이미 신고한 기록입니다.")
                         else:
                             st.error("신고 저장 중 오류가 발생했습니다.")
-                            st.caption(str(e))
+                        st.caption(str(e))

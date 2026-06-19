@@ -190,20 +190,67 @@ def insert_combat_record(record: dict):
     return result.data
 
 
-def delete_combat_record(record_id: int, user_id: str):
+def delete_combat_record(record_id: int | str, user_id: str):
     """Delete a combat record owned by the given user.
 
-    Only deletes if both record id and user id match.
+    Behavior:
+      1) Convert record_id to int (raise ValueError if not possible)
+      2) Verify the record exists and is owned by the given user
+      3) Execute delete
+      4) Re-query the record id to ensure deletion succeeded
+
+    Returns a dict with keys:
+      - success: bool
+      - message: human-readable message
+      - reason: optional machine-readable reason on failure
     """
+    try:
+        record_id = int(record_id)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("record_id must be an integer") from exc
+
     supabase = get_supabase_client()
-    result = (
+
+    # 1) check ownership / existence before deletion
+    pre_check = (
+        supabase.table("combat_records")
+        .select("id")
+        .eq("id", record_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    if not pre_check.data:
+        return {
+            "success": False,
+            "reason": "not_found_or_not_owner",
+            "message": "현재 로그인 사용자의 기록을 찾을 수 없습니다.",
+        }
+
+    # 2) attempt delete
+    _ = (
         supabase.table("combat_records")
         .delete()
         .eq("id", record_id)
         .eq("user_id", user_id)
         .execute()
     )
-    return result.data
+
+    # 3) verify deletion by re-querying the id
+    post_check = (
+        supabase.table("combat_records")
+        .select("id")
+        .eq("id", record_id)
+        .execute()
+    )
+
+    if not post_check.data:
+        return {"success": True, "message": "기록이 삭제되었습니다."}
+    else:
+        return {
+            "success": False,
+            "reason": "still_exists",
+            "message": "삭제 후에도 기록이 DB에 남아 있습니다.",
+        }
 
 
 def insert_report(record_id: int, reporter_user_id: str, report_reason: str):

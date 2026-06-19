@@ -5,6 +5,22 @@ from lib.utils import render_sidebar, format_created_date
 
 render_sidebar()
 
+st.markdown(
+    """
+    <style>
+    div.stButton > button {
+        background-color: #d62828 !important;
+        color: white !important;
+        border-color: #9b1c1c !important;
+    }
+    div.stButton > button:hover {
+        background-color: #b71c1c !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("내 기록")
 
 user = get_current_user()
@@ -82,29 +98,55 @@ try:
                     if rec.get('video_url'):
                         st.write(f"**영상 링크:** [링크]({rec.get('video_url')})")
 
-                    st.markdown("---")
-                    st.warning("위험 작업")
-                    st.write("삭제한 기록은 복구할 수 없습니다.")
-
+                    st.divider()
+                    st.warning("삭제한 기록은 복구할 수 없습니다.")
                     record_id = rec.get("id")
                     confirm_key = f"confirm_delete_{record_id or i}"
                     delete_key = f"delete_record_{record_id or i}"
-                    confirm_delete = st.checkbox("이 기록을 삭제하겠습니다.", key=confirm_key)
 
                     if record_id is None:
-                        st.error("기록 ID를 찾을 수 없습니다.")
+                        st.error("기록 ID를 찾을 수 없어 삭제할 수 없습니다.")
                     else:
+                        confirm_delete = st.checkbox(
+                            "이 기록을 삭제하겠습니다.",
+                            key=confirm_key,
+                        )
                         if st.button("기록 삭제", key=delete_key):
                             if not confirm_delete:
                                 st.warning("삭제하려면 확인 체크박스를 선택해주세요.")
                             else:
-                                try:
-                                    delete_combat_record(record_id, user["id"])
-                                    st.success("기록이 삭제되었습니다.")
-                                    st.experimental_rerun()
-                                except Exception as e:
-                                    st.error("기록 삭제 중 오류가 발생했습니다.")
-                                    st.caption(str(e))
+                                current_user = user
+                                current_user_id = current_user.get("id") if current_user else None
+                                if not current_user_id:
+                                    st.error("로그인 정보를 확인할 수 없습니다.")
+                                else:
+                                    record_owner_id = rec.get("user_id")
+                                    # ensure only owner's records can be deleted
+                                    if record_owner_id is not None and str(record_owner_id) != str(current_user_id):
+                                        st.error("현재 로그인 사용자의 기록만 삭제할 수 있습니다.")
+                                    else:
+                                        try:
+                                            result = delete_combat_record(record_id, current_user_id)
+                                            if isinstance(result, dict) and result.get("success"):
+                                                st.success(result.get("message", "기록이 삭제되었습니다."))
+                                                st.rerun()
+                                            else:
+                                                # Determine specific failure reason
+                                                if isinstance(result, dict) and result.get("reason") == "still_exists":
+                                                    st.warning(
+                                                        "삭제 후에도 기록이 DB에 남아 있습니다. RLS 정책 또는 DB 권한을 확인해주세요."
+                                                    )
+                                                else:
+                                                    msg = result.get("message") if isinstance(result, dict) else "삭제에 실패했습니다."
+                                                    st.warning(msg)
+                                                # always show debug info to help diagnose RLS/permission issues
+                                                with st.expander("삭제 디버그 정보", expanded=True):
+                                                    st.write("record_id:", record_id)
+                                                    st.write("record_user_id:", rec.get("user_id"))
+                                                    st.write("current_user_id:", current_user_id)
+                                        except Exception as e:
+                                            st.error("기록 삭제 중 오류가 발생했습니다.")
+                                            st.caption(str(e))
 except Exception as e:
     st.error("내 기록 데이터를 불러오지 못했습니다.")
     st.caption(str(e))
