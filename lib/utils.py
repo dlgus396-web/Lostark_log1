@@ -27,3 +27,28 @@ def render_score_card(title: str, value: str, description: str = ""):
 
 def render_empty_state(message: str):
     st.info(message)
+
+
+def format_created_date(created_at: str | None) -> str:
+    """Format ISO datetime string to YYYY/MM/DD or return '-' on failure.
+
+    Examples:
+      2026-06-19T04:15:24.126204+00:00 -> 2026/06/19
+    """
+    if not created_at:
+        return "-"
+    try:
+        from datetime import datetime
+        dt = datetime.fromisoformat(created_at)
+        return dt.strftime("%Y/%m/%d")
+    except Exception:
+        # fallback: try first 10 chars YYYY-MM-DD
+        try:
+            if isinstance(created_at, str) and len(created_at) >= 10:
+                date_str = created_at[:10]
+                from datetime import datetime
+                dt = datetime.strptime(date_str, "%Y-%m-%d")
+                return dt.strftime("%Y/%m/%d")
+        except Exception:
+            pass
+    return "-"

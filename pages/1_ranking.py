@@ -1,35 +1,8 @@
 import streamlit as st
-from datetime import datetime
 from lib.auth import get_current_user
-from lib.db_queries import load_ranking_records, load_supported_classes, load_bosses, insert_report
-from lib.utils import render_empty_state, render_sidebar
+from lib.db_queries import load_ranking_records, load_supported_classes, load_bosses, load_boss_map, insert_report
+from lib.utils import render_empty_state, render_sidebar, format_created_date
 
-def format_created_date(created_at: str | None) -> str:
-    """Format ISO datetime string to YYYY/MM/DD format.
-    
-    Args:
-        created_at: ISO format datetime string (e.g., 2026-06-17T14:28:37.879381+00:00)
-    
-    Returns:
-        Formatted date string in YYYY/MM/DD format, or "-" if None.
-    """
-    if created_at is None:
-        return "-"
-    
-    try:
-        # Parse ISO format datetime
-        dt = datetime.fromisoformat(created_at)
-        return dt.strftime("%Y/%m/%d")
-    except (ValueError, TypeError):
-        # Fallback: use first 10 characters (YYYY-MM-DD) and convert to YYYY/MM/DD
-        if isinstance(created_at, str) and len(created_at) >= 10:
-            date_str = created_at[:10]  # YYYY-MM-DD
-            try:
-                dt = datetime.strptime(date_str, "%Y-%m-%d")
-                return dt.strftime("%Y/%m/%d")
-            except ValueError:
-                return "-"
-        return "-"
 
 render_sidebar()
 
@@ -38,25 +11,32 @@ st.title("상위 랭킹")
 try:
     supported_classes = load_supported_classes()
     bosses = load_bosses()
+    boss_map = load_boss_map()
 except Exception as e:
     st.error("랭킹 데이터를 불러오지 못했습니다.")
     st.caption(str(e))
     st.stop()
 
 class_options = ["전체"] + [c["class_name"] for c in supported_classes]
-boss_options = ["전체"] + [b["boss_display_name"] for b in bosses]
+
+# Build boss filter options with id/label so selection maps to exact boss_id
+boss_filter_options = [
+    {"label": "전체", "id": None}
+]
+for b in bosses:
+    label = boss_map.get(b.get("id")) or b.get("boss_display_name") or "-"
+    boss_filter_options.append({"label": label, "id": b.get("id")})
 
 selected_class = st.selectbox("직업 필터", class_options, index=0)
-selected_boss = st.selectbox("레이드 필터", boss_options, index=0)
+boss_labels = [opt["label"] for opt in boss_filter_options]
+selected_boss_label = st.selectbox("레이드 필터", boss_labels, index=0)
 
 class_filter = None if selected_class == "전체" else selected_class
-boss_id = None
-if selected_boss != "전체":
-    boss_candidate = next((b for b in bosses if b["boss_display_name"] == selected_boss), None)
-    boss_id = boss_candidate["id"] if boss_candidate else None
+# map selected label back to id
+selected_boss_id = next((opt["id"] for opt in boss_filter_options if opt["label"] == selected_boss_label), None)
 
 try:
-    records = load_ranking_records(class_filter, boss_id)
+    records = load_ranking_records(class_filter, selected_boss_id)
 except Exception as e:
     st.error("랭킹 데이터를 불러오지 못했습니다.")
     st.caption(str(e))
@@ -72,7 +52,7 @@ else:
             "순위": idx,
             "캐릭터명": rec.get("character_name") or "-",
             "직업": rec.get("class_name"),
-            "레이드 ID": rec.get("boss_id"),
+            "레이드": boss_map.get(rec.get("boss_id"), "알 수 없음"),
             "최종 점수": rec.get("final_score"),
             "핵심 행동 CPM": rec.get("key_action_cpm"),
             "백어택률": rec.get("back_attack_rate"),
@@ -86,11 +66,12 @@ else:
     user = get_current_user()
     for idx, rec in enumerate(records, start=1):
         record_id = rec.get("id")
-        expander_title = f"순위 {idx} - {rec.get('character_name', '-') or '-'} / {rec.get('class_name', 'N/A')} / 점수 {rec.get('final_score', 'N/A')}"
+        raid_display = boss_map.get(rec.get('boss_id')) or "-"
+        expander_title = f"순위 {idx} - {rec.get('character_name', '-') or '-'} / {rec.get('class_name', 'N/A')} / {raid_display} / 점수 {rec.get('final_score', 'N/A')}"
         with st.expander(expander_title):
             st.write(f"**캐릭터명:** {rec.get('character_name') or '-'}")
             st.write(f"**직업:** {rec.get('class_name')}")
-            st.write(f"**레이드 ID:** {rec.get('boss_id')}")
+            st.write(f"**레이드:** {raid_display}")
             st.write(f"**최종 점수:** {rec.get('final_score')}")
             st.write(f"**핵심 행동 CPM:** {rec.get('key_action_cpm')}")
             st.write(f"**백어택률:** {rec.get('back_attack_rate')}")

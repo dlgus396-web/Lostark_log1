@@ -21,6 +21,40 @@ def load_bosses():
     )
     return result.data
 
+
+def format_boss_display(boss: dict) -> str:
+    """Format boss dict into display string like '세르카 1관문'.
+
+    Falls back to cleaned boss_display_name if raid_name missing.
+    Removes common difficulty words if present.
+    """
+    if not boss:
+        return ""
+    raid_name = boss.get("raid_name")
+    gate_no = boss.get("gate_no")
+    if raid_name:
+        try:
+            return f"{raid_name} {int(gate_no)}관문"
+        except Exception:
+            return f"{raid_name} {gate_no}관문"
+
+    display = boss.get("boss_display_name") or ""
+    # remove common difficulty words (English + Korean) to avoid showing difficulty
+    cleaned = re.sub(r"\b(Nightmare|Hard|Normal|Easy|나이트메어|하드|노말)\b", "", display, flags=re.IGNORECASE).strip()
+    return cleaned or display
+
+
+def load_boss_map() -> dict:
+    """Return dict mapping boss id -> formatted display name."""
+    bosses = load_bosses() or []
+    mapping = {}
+    for b in bosses:
+        try:
+            mapping[b["id"]] = format_boss_display(b)
+        except Exception:
+            mapping[b.get("id")] = b.get("boss_display_name") or ""
+    return mapping
+
 def load_score_rules(class_name: str):
     supabase = get_supabase_client()
     result = (

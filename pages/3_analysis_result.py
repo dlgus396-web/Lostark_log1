@@ -16,22 +16,30 @@ if not result:
 else:
     if not user:
         st.info("로그인하면 분석 결과를 DB에 저장할 수 있습니다. 로그인 페이지로 이동해주세요.")
+
     st.metric("최종 점수", f"{result['final_score']:.2f}")
-    st.write(f"**캐릭터명:** {result.get('character_name', '-')}")
-    st.write(f"**직업:** {result['class_name']}")
-    st.write(f"**레이드:** {result.get('boss_name_raw') or result.get('boss_id')}")
-    st.write(f"**전투 시간:** {result.get('battle_time_text') or 'N/A'}")
-    st.write(f"**핵심 행동:** {result.get('key_action_name')}")
-    st.write(f"**핵심 행동 사용 횟수:** {result.get('key_action_count')}")
-    st.write(f"**핵심 행동 CPM:** {result.get('key_action_cpm')}")
-    if result.get("back_attack_rate") is not None:
-        st.write(f"**백어택 적중률:** {result['back_attack_rate']}")
-    if result.get("video_url"):
+
+    # 깔끔한 레이아웃: 주요 정보들을 두 칼럼으로 배치
+    left, right = st.columns([2, 1])
+
+    with left:
+        st.write(f"**캐릭터명:** {result.get('character_name', '-')} ")
+        st.write(f"**직업:** {result.get('class_name', '-')} ")
+        st.write(f"**레이드:** {result.get('boss_name_raw') or result.get('boss_id')}")
+        st.write(f"**전투 시간:** {result.get('battle_time_text') or 'N/A'}")
+
+    with right:
+        st.write(f"**핵심 행동:** {result.get('key_action_name', '-')}")
+        st.write(f"**핵심 행동 사용 횟수:** {result.get('key_action_count', 0)}")
+        st.write(f"**핵심 행동 CPM:** {result.get('key_action_cpm', 0)}")
+        # 백어택률은 블레이드일 때만 표시
+        if result.get('class_name') == '블레이드' and result.get('back_attack_rate') is not None:
+            st.write(f"**백어택 적중률:** {result['back_attack_rate']}")
+
+    # 영상 링크는 입력된 경우에만 표시
+    if result.get('video_url'):
         st.write(f"**영상 링크:** {result['video_url']}")
-    st.write(f"**OCR 원문:** {result['ocr_raw_text']}")
-    if result.get("screenshot_url"):
-        st.markdown(f"**스크린샷:** [{result['screenshot_url']}]({result['screenshot_url']})")
-    st.info("로그인/ OCR/ Storage 업로드는 mock 상태입니다. DB 저장만 실제로 시도합니다.")
+    st.info("OCR 결과는 사용자가 확인 및 수정할 수 있으며, 최종 분석 기록은 DB에 저장됩니다.")
     def normalize_ocr_status_for_db(status: str | None) -> str:
         """Normalize various ocr_status inputs to either 'success' or 'fallback_used'.
 
@@ -53,13 +61,18 @@ else:
         return "fallback_used"
 
     # build record only with allowed columns for combat_records
+    # Hide mock screenshot URL from display; normalize mock to None for DB
+    screenshot_url = result.get("screenshot_url")
+    if screenshot_url == "mock://uploaded_screenshot.png":
+        screenshot_url = None
+
     record = {
         "user_id": user["id"] if user else None,
         "class_name": result.get("class_name"),
         "boss_id": result.get("boss_id"),
         "boss_name_raw": result.get("boss_name_raw") or str(result.get("boss_id")),
         "character_name": result.get("character_name"),
-        "screenshot_url": result.get("screenshot_url"),
+        "screenshot_url": screenshot_url,
         "ocr_raw_text": result.get("ocr_raw_text"),
         # normalize to DB-allowed values
         "ocr_status": normalize_ocr_status_for_db(result.get("ocr_status")),

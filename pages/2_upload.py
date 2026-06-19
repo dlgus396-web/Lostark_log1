@@ -1,5 +1,6 @@
 import streamlit as st
 
+from lib.auth import get_current_user
 from lib.utils import render_sidebar
 from lib.db_queries import load_supported_classes, load_bosses, load_score_rules, load_baselines
 from lib.scoring import calculate_final_score
@@ -13,6 +14,13 @@ from lib.image_analysis import (
 render_sidebar()
 
 st.title("전투 기록 업로드")
+
+current_user = get_current_user()
+if not current_user:
+    st.warning("기록 업로드 기능을 사용하려면 로그인이 필요합니다.")
+    if st.button("로그인하러 가기"):
+        st.switch_page("pages/0_login.py")
+    st.stop()
 
 try:
     classes = load_supported_classes()
@@ -43,6 +51,9 @@ character_name = st.text_input("캐릭터명", placeholder="예: 창키타카")
 # 직업별 스크린샷 업로드
 if selected_class in ["블레이드", "브레이커"]:
     st.subheader(f"스크린샷 업로드 ({selected_class})")
+    if selected_class == "브레이커":
+        st.info("브레이커는 종합 정보에서 전투 시간, 공격 정보에서 권왕십이식 : 낙화 사용 횟수를 추출합니다.")
+
     col1, col2 = st.columns(2)
 
     with col1:
@@ -181,6 +192,19 @@ if selected_class in ["블레이드", "브레이커", "아르카나"]:
             if selected_class in ["블레이드", "브레이커"]:
                 st.write("**공격 정보 OCR:**")
                 st.code(analysis.get("attack_ocr_raw", ""))
+            if selected_class == "브레이커" and analysis.get("attack_crop_ocr_raw"):
+                st.write("**공격 정보 Crop OCR (낙화 사용 횟수 영역):**")
+                st.code(analysis.get("attack_crop_ocr_raw", ""))
+                if selected_class == "아르카나" and analysis.get("card_crop_ocr_raw"):
+                    st.write("**카드 사용 횟수 Crop OCR:**")
+                    st.code(analysis.get("card_crop_ocr_raw", ""))
+            if analysis.get("ocr_error"):
+                st.write("**OCR 오류/디버그:**")
+                st.code(analysis.get("ocr_error"))
+
+        if selected_class == "브레이커":
+            if not analysis.get("summary_ocr_raw") or analysis.get("summary_ocr_raw") == "[OCR 결과 없음]" or not analysis.get("attack_ocr_raw") or analysis.get("attack_ocr_raw") == "[OCR 결과 없음]":
+                st.warning("OCR 결과가 비어 있습니다. 이미지 파일 또는 OCR 라이브러리 설치 상태를 확인해주세요.")
 
         if battle_time_str and key_action_count > 0:
             battle_time_minutes = parse_battle_time_to_minutes(battle_time_str)
