@@ -159,44 +159,48 @@ def crop_by_ratio(image, left: float, top: float, right: float, bottom: float):
 def extract_blade_burst_count(text: str) -> Optional[int]:
     if not text:
         return None
+    normalized = text.replace('\u200b', ' ').replace('\xa0', ' ')
+    normalized = re.sub(r'\r\n|\r', '\n', normalized)
+    lines = [ln.strip() for ln in normalized.splitlines() if ln.strip()]
+
     burst_patterns = [
-        r'블레이드\s*버스트[:\s]+(\d+)',
+        r'(?:블레이드|불레이드)\s*버스트[:\s]+(\d+)',
         r'Blade\s*Burst[:\s]+(\d+)',
         r'버스트[:\s]+(\d+)',
     ]
     for pattern in burst_patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            try:
-                val = int(match.group(1))
-                if 1 <= val <= 300:
-                    return val
-            except ValueError:
-                pass
-    lines = [ln.rstrip() for ln in text.splitlines() if ln is not None]
+        for line in lines:
+            match = re.search(pattern, line, re.IGNORECASE)
+            if match:
+                try:
+                    val = int(match.group(1))
+                    if 1 <= val <= 300:
+                        return val
+                except ValueError:
+                    pass
+
     for i, line in enumerate(lines):
-        if '버스트' in line:
-            window_lines = lines[i:i+11]
-            for wl in window_lines:
-                if re.match(r'^\s*\d{1,3}\s*$', wl):
+        if re.search(r'(?:블레이드|불레이드).*버스트', line, re.IGNORECASE) or '버스트' in line:
+            for wl in lines[i + 1 : i + 10]:
+                cleaned = wl.replace(',', '').strip()
+                if re.fullmatch(r'\d{1,3}', cleaned):
                     try:
-                        val = int(wl.strip())
+                        val = int(cleaned)
                         if 1 <= val <= 300:
                             return val
                     except ValueError:
                         pass
             candidates = []
-            for wl in window_lines:
-                for m in re.finditer(r'(?<![\d.,억])(\d{1,3})(?![\d.,억])', wl):
+            for wl in lines[i + 1 : i + 10]:
+                if '.' in wl or ',' in wl:
+                    continue
+                for m in re.finditer(r'(?<![\d억만%])([0-9]{1,3})(?![\d억만%])', wl):
                     try:
                         num = int(m.group(1))
                         if 1 <= num <= 300:
                             candidates.append(num)
                     except ValueError:
                         continue
-            wide_candidates = [c for c in candidates if 80 <= c <= 200]
-            if wide_candidates:
-                return wide_candidates[-1]
             if candidates:
                 return candidates[-1]
     return None
@@ -307,34 +311,62 @@ def _extract_clean_integers(text: str) -> list:
 def extract_breaker_nakhwa_count(text: str) -> Optional[int]:
     if not text:
         return None
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    normalized = text.replace('\u200b', ' ').replace('\xa0', ' ')
+    normalized = re.sub(r'[.,]{1,2}', ' ', normalized)
+    normalized = re.sub(r'\s+', ' ', normalized)
+    lines = [ln.strip() for ln in normalized.splitlines() if ln.strip()]
     if not lines:
         return None
+
+    def extract_simple_numbers(source: str) -> list[int]:
+        return [int(m.group(1)) for m in re.finditer(r'(?<![\d억만%])([0-9]{1,3})(?![\d억만%])', source)]
+
+    direct_patterns = [
+        r'(?:권왕십이식|낙화)[^\d\n]{0,50}([0-9]{1,3})',
+        r'낙화\s*[:：]?\s*([0-9]{1,3})',
+        r'권왕십이식\s*[:：]?\s*낙화[^\d\n]{0,50}([0-9]{1,3})',
+        r'낙화[^\d\n]{0,30}사용[^\d\n]{0,30}([0-9]{1,3})',
+        r'사용\s*횟수[^\d\n]{0,30}([0-9]{1,3})',
+        r'([0-9]{1,3})\s*회',
+    ]
+    for pattern in direct_patterns:
+        for match in re.finditer(pattern, normalized):
+            try:
+                value = int(match.group(1))
+                if 1 <= value <= 300:
+                    return value
+            except (ValueError, IndexError):
+                continue
+
     normalized_lines = [ln.replace(' ', '') for ln in lines]
     key_indices = [i for i, ln in enumerate(normalized_lines) if '낙화' in ln or '권왕십이식' in ln]
     if not key_indices:
         return None
+
     for idx in key_indices:
-        window_lines = lines[idx: idx + 12]
-        window_text = '\n'.join(window_lines)
+        window_lines = lines[idx: idx + 18]
+        window_text = ' '.join(window_lines)
+
         for wl in window_lines:
-            if '사용' in wl or '횟수' in wl:
-                candidates = _extract_clean_integers(wl)
-                for c in candidates:
-                    v = int(c)
-                    if 20 <= v <= 300:
+            if any(keyword in wl for keyword in ['사용', '횟수', '회']):
+                candidates = extract_simple_numbers(wl)
+                for v in candidates:
+                    if 1 <= v <= 300:
                         return v
-        for wl in window_lines:
-            if '낙화' in wl:
-                candidates = _extract_clean_integers(wl)
-                for c in candidates:
-                    v = int(c)
-                    if 20 <= v <= 300:
+
+        for line in window_lines:
+            if '낙화' in line or '권왕십이식' in line:
+                candidates = extract_simple_numbers(line)
+                for v in candidates:
+                    if 1 <= v <= 300:
                         return v
-        candidates = _extract_clean_integers(window_text)
-        valid = [int(c) for c in candidates if 20 <= int(c) <= 300]
-        if valid:
-            return valid[-1]
+
+        nearby_candidates = extract_simple_numbers(window_text)
+        filtered = [v for v in nearby_candidates if 1 <= v <= 300]
+        if filtered:
+            return filtered[-1]
+
+    # last fallback: try image crop-based extraction if text-based extraction fails
     return None
 
 
@@ -481,7 +513,7 @@ def analyze_breaker_images(summary_image, attack_image) -> dict:
                     result["ocr_error"] += " | "
                 result["ocr_error"] += f"attack: {attack_error}"
             nakhwa_count = extract_breaker_nakhwa_count(attack_text)
-            if nakhwa_count is None or nakhwa_count < 5:
+            if nakhwa_count is None or nakhwa_count < 15 or nakhwa_count > 80:
                 try:
                     crop_nakhwa = extract_breaker_nakhwa_count_from_image(attack_image)
                     if crop_nakhwa is not None:
